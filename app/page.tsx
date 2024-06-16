@@ -4,22 +4,30 @@ import { ModeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { VolumeFeature } from "@/components/volumefeature"
-import { Camera, FlipHorizontal, MoonIcon, PersonStanding, SunIcon, Video } from "lucide-react"
-import { useRef, useState } from "react"
+import { Camera, Divide, FlipHorizontal, MoonIcon, PersonStanding, SunIcon, Video } from "lucide-react"
+import { RefObject, useEffect, useRef, useState } from "react"
 import { Rings } from "react-loader-spinner"
 import Webcam from "react-webcam"
 import { toast } from "sonner"
+import * as cocossd from "@tensorflow-models/coco-ssd"
+import "@tensorflow/tfjs-backend-cpu"
+import "@tensorflow/tfjs-backend-webgl"
+import { DetectedObject, ObjectDetection } from "@tensorflow-models/coco-ssd"
+import { drawOncanvas } from "@/utils/draw"
 
 
 type Props = {}
 
+let interval:any=null;
 const HomePage  = (props: Props) => {
   const webcamRef=useRef<Webcam>(null);
   const canvasRef=useRef<HTMLCanvasElement>(null);
 
-  const [mirrored, setmirrored] = useState<boolean>(false);
+  const [mirrored, setmirrored] = useState<boolean>(true);
   const [isRecording, setisRecording] = useState<boolean>(false);
-  const [autoRecordEnabled, setautoRecordEnabled] = useState<boolean>(false)
+  const [autoRecordEnabled, setautoRecordEnabled] = useState<boolean>(false);
+  const [model, setmodel] = useState<ObjectDetection>();
+  const [loading, setloading] = useState(false);
 
   const userPromptScreenshot=()=>{
     //take picture
@@ -131,6 +139,42 @@ const HomePage  = (props: Props) => {
       </div>
   }
 
+  useEffect(()=>{
+    setloading(true);
+    initModel();
+  },[]);
+
+  const initModel= async()=>{
+    const loadedModel:ObjectDetection=await cocossd.load({
+      base: "mobilenet_v2"
+    });
+    setmodel(loadedModel);
+  };
+
+  useEffect(()=>{
+    if(model){
+       setloading(false);
+    }
+  },[model]);
+
+  const runprediction=async()=>{
+    if(model && webcamRef.current 
+      &&webcamRef.current.video && webcamRef.current.video.readyState===4){
+        const predictions:DetectedObject[]=await model.detect(webcamRef.current.video);
+        
+        resizeCanvas(canvasRef,webcamRef);
+        drawOncanvas(mirrored,predictions,canvasRef.current?.getContext("2d"))
+      }
+  }
+
+  useEffect(()=>{
+    interval=setInterval(()=>{
+      runprediction();
+    },100);
+
+    return ()=>clearInterval(interval);
+  },[webcamRef.current,model,mirrored]);
+
   return (<div className="flex h-screen">
     {/* left diviion-webcam and canvas */}
       <div className="relative">
@@ -202,8 +246,23 @@ const HomePage  = (props: Props) => {
           <RenderFeatureHighlightsSection/>
         </div>
       </div>
+      {loading && <div className="z-50 absolute w-full h-full flex items-center justify-center
+      bg-primary-foreground">
+        Getting things ready . . .<Rings height={50} color="red"/>
+        </div>}
     </div>
   )
 }
 
 export default HomePage;
+
+function resizeCanvas(canvasRef: RefObject<HTMLCanvasElement>, webcamRef: RefObject<Webcam>) {
+  const canvas=canvasRef.current;
+  const video=webcamRef.current?.video;
+
+  if(canvas && video){
+    const {videoWidth,videoHeight}=video;
+    canvas.width=videoWidth;
+    canvas.height=videoHeight;
+  }
+}
