@@ -1,5 +1,6 @@
 "use client"
 
+import { ModeToggle } from "@/components/theme-toggle"
 import { Separator } from "@/components/ui/separator"
 import { useRef, useState } from "react"
 import Webcam from "react-webcam"
@@ -35,8 +36,20 @@ const HomePage  = (props: Props) => {
         gap-2 justify-between shadow-md rounded-md p-4">
           {/* top section */}
           <div className="flex flex-col gap-2">
+            <ModeToggle/>
             <Separator/>
           </div>
+
+          {/* middle section */}
+          <div className="flex flex-col gap-2">
+            <Separator/>
+          </div>
+
+          {/* bottom section */}
+          <div className="flex flex-col gap-2">
+            <Separator/>
+          </div>
+  
 
         </div>
       </div>
