@@ -14,6 +14,7 @@ import "@tensorflow/tfjs-backend-cpu"
 import "@tensorflow/tfjs-backend-webgl"
 import { DetectedObject, ObjectDetection } from "@tensorflow-models/coco-ssd"
 import { drawOncanvas } from "@/utils/draw"
+import { beep } from "@/utils/audio"
 
 
 type Props = {}
@@ -29,12 +30,25 @@ const HomePage  = (props: Props) => {
   const [autoRecordEnabled, setautoRecordEnabled] = useState<boolean>(false);
   const [model, setmodel] = useState<ObjectDetection>();
   const [loading, setloading] = useState(false);
+  const [volume, setvolume] = useState(0.8);
 
   const mediaRecorderRef=useRef<MediaRecorder | null>(null);
 
   const userPromptScreenshot=()=>{
     //take picture
+    if(!webcamRef.current){
+      toast("Camera not found. Please refresh.")
+    }
+    else{
+      const imageSrc=webcamRef.current.getScreenshot();
+      const blob=base64toBlob(imageSrc);
 
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=`${formatDate(new Date())}.png`;
+      a.click();
+    }
 
     //and save it to downloads
   }
@@ -57,14 +71,15 @@ const HomePage  = (props: Props) => {
     else{
       //if not recording
       //then start recording
-      startRecording();
+      startRecording(false);
     }
 
   }
 
-  const startRecording=()=>{
+  const startRecording=(doBeep:boolean)=>{
     if(webcamRef.current && mediaRecorderRef.current?.state!=="recording"){
       mediaRecorderRef.current?.start();
+      doBeep && beep(volume);
 
       stopTimeout=setTimeout(() => {
         if(mediaRecorderRef.current?.state=="recording"){
@@ -199,8 +214,8 @@ const HomePage  = (props: Props) => {
             isPerson=prediction.class==="person";
           })
 
-          if(isPerson){
-            startRecording();
+          if(isPerson && autoRecordEnabled ){
+            startRecording(true);
           }
         }
       }
@@ -212,7 +227,7 @@ const HomePage  = (props: Props) => {
     },100);
 
     return ()=>clearInterval(interval);
-  },[webcamRef.current,model,mirrored]);
+  },[webcamRef.current,model,mirrored,autoRecordEnabled]);
 
   
   //initialize the media recorder
@@ -350,4 +365,16 @@ const formatDate=(d:Date)=>{
       d.getSeconds().toString().padStart(2, "0"),
     ].join("-");
   return formattedDate;
+}
+
+function base64toBlob(base64Data: any) {
+  const byteCharacters = atob(base64Data.split(",")[1]);
+  const arrayBuffer = new ArrayBuffer(byteCharacters.length);
+  const byteArray = new Uint8Array(arrayBuffer);
+
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteArray[i] = byteCharacters.charCodeAt(i);
+  }
+
+  return new Blob([arrayBuffer], { type: "image/png" }); // Specify the image type here
 }
