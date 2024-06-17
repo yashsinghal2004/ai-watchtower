@@ -227,7 +227,7 @@ const HomePage  = (props: Props) => {
     },100);
 
     return ()=>clearInterval(interval);
-  },[webcamRef.current,model,mirrored,autoRecordEnabled]);
+  },[webcamRef.current,model,mirrored,autoRecordEnabled,runprediction]);
 
   
   //initialize the media recorder
