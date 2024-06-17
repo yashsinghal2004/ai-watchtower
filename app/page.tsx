@@ -19,6 +19,7 @@ import { drawOncanvas } from "@/utils/draw"
 type Props = {}
 
 let interval:any=null;
+let stopTimeout:any=null;
 const HomePage  = (props: Props) => {
   const webcamRef=useRef<Webcam>(null);
   const canvasRef=useRef<HTMLCanvasElement>(null);
@@ -29,6 +30,8 @@ const HomePage  = (props: Props) => {
   const [model, setmodel] = useState<ObjectDetection>();
   const [loading, setloading] = useState(false);
 
+  const mediaRecorderRef=useRef<MediaRecorder | null>(null);
+
   const userPromptScreenshot=()=>{
     //take picture
 
@@ -37,14 +40,39 @@ const HomePage  = (props: Props) => {
   }
 
   const userPromptRecord=()=>{
-    //check if recording
+
+    if(!webcamRef.current){
+      toast("Camera is not found. Please refresh.")
+    }
+
+    if(mediaRecorderRef.current?.state=="recording"){
+      //check if recording
       //then stop recording
       //and save to downloads
-
-
-    //if not recording
+      mediaRecorderRef.current.requestData();
+      clearTimeout(stopTimeout);
+      mediaRecorderRef.current.stop();
+      toast("Recording saved to downloads");
+    }
+    else{
+      //if not recording
       //then start recording
+      startRecording();
+    }
 
+  }
+
+  const startRecording=()=>{
+    if(webcamRef.current && mediaRecorderRef.current?.state!=="recording"){
+      mediaRecorderRef.current?.start();
+
+      stopTimeout=setTimeout(() => {
+        if(mediaRecorderRef.current?.state=="recording"){
+          mediaRecorderRef.current.requestData();
+          mediaRecorderRef.current.stop();
+        }
+      }, 30000);
+    }
   }
 
   const toggleAutoRecord=()=>{
@@ -164,6 +192,17 @@ const HomePage  = (props: Props) => {
         
         resizeCanvas(canvasRef,webcamRef);
         drawOncanvas(mirrored,predictions,canvasRef.current?.getContext("2d"))
+      
+        let isPerson:boolean=false;
+        if(predictions.length>0){
+          predictions.forEach((prediction)=>{
+            isPerson=prediction.class==="person";
+          })
+
+          if(isPerson){
+            startRecording();
+          }
+        }
       }
   }
 
@@ -174,6 +213,35 @@ const HomePage  = (props: Props) => {
 
     return ()=>clearInterval(interval);
   },[webcamRef.current,model,mirrored]);
+
+  
+  //initialize the media recorder
+  useEffect(()=>{
+    if(webcamRef && webcamRef.current){
+      const stream=(webcamRef.current.video as any).captureStream();
+      if(stream){
+        mediaRecorderRef.current=new MediaRecorder(stream);
+
+        mediaRecorderRef.current.ondataavailable=(e)=>{
+          if(e.data.size>0){
+            const recordedBlob=new Blob([e.data],{type:"video"});
+            const videoURL=URL.createObjectURL(recordedBlob);
+
+            const a =document.createElement("a");
+            a.href=videoURL;
+            a.download=`${formatDate(new Date())}.webm`;
+            a.click();
+          }
+        };
+        mediaRecorderRef.current.onstart=(e)=>{
+          setisRecording(true);       
+        }
+        mediaRecorderRef.current.onstop=(e)=>{
+          setisRecording(false);       
+        }
+      }
+    }
+  },[webcamRef]);
 
   return (<div className="flex h-screen">
     {/* left diviion-webcam and canvas */}
@@ -256,7 +324,7 @@ const HomePage  = (props: Props) => {
 
 export default HomePage;
 
-function resizeCanvas(canvasRef: RefObject<HTMLCanvasElement>, webcamRef: RefObject<Webcam>) {
+const resizeCanvas=(canvasRef: RefObject<HTMLCanvasElement>, webcamRef: RefObject<Webcam>)=> {
   const canvas=canvasRef.current;
   const video=webcamRef.current?.video;
 
@@ -265,4 +333,21 @@ function resizeCanvas(canvasRef: RefObject<HTMLCanvasElement>, webcamRef: RefObj
     canvas.width=videoWidth;
     canvas.height=videoHeight;
   }
+}
+
+const formatDate=(d:Date)=>{
+  const formattedDate =
+    [
+      (d.getMonth() + 1).toString().padStart(2, "0"),
+      d.getDate().toString().padStart(2, "0"),
+      d.getFullYear(),
+    ]
+      .join("-") +
+    " " +
+    [
+      d.getHours().toString().padStart(2, "0"),
+      d.getMinutes().toString().padStart(2, "0"),
+      d.getSeconds().toString().padStart(2, "0"),
+    ].join("-");
+  return formattedDate;
 }
