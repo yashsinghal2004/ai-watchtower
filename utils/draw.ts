@@ -15,7 +15,7 @@ export const drawOncanvas=(
 
             //styling:
             ctx.font="12px Courier New";
-            ctx.fillStyle=name==="person"? "#FF0F0F": "#00B612";
+            ctx.fillStyle=name==="person"? "#FF0F0F": "#008000";
             ctx.globalAlpha=0.4;
 
             mirrored?
